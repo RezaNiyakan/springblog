@@ -1,9 +1,11 @@
 package com.codeup.springblog.controllers;
 
 import com.codeup.springblog.models.Post;
+import com.codeup.springblog.models.User;
 import com.codeup.springblog.repositories.PostRepository;
 import com.codeup.springblog.repositories.UserRepository;
 import com.codeup.springblog.services.EmailService;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -47,9 +49,8 @@ public class PostController {
 
     @PostMapping("/posts/create")
     public String submitCreateForm(@ModelAttribute Post newPost) {
-        //Post newPost = new Post(title, body);
-        newPost.setUser(usersDao.getById(1L));
-        emailService.prepareAndSend(newPost, "New post created", "You posted to the blog!");
+        newPost.setUser((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        emailService.prepareAndSend(newPost, "New post created", "You had posted to our blog!");
         postsDao.save(newPost);
 
         return "redirect:/posts";
@@ -58,21 +59,30 @@ public class PostController {
     @GetMapping("/posts/{id}/edit")
     public String showEditForm(@PathVariable long id, Model model) {
         Post posttoEdit = postsDao.getById(id);
-        model.addAttribute("postToEdit", posttoEdit);
-        return "posts/edit";
+        User loggedInUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (posttoEdit.getUser().getId() == loggedInUser.getId()) {
+            model.addAttribute("postToEdit", posttoEdit);
+            return "posts/edit";
+        } else {
+            return "redirect:/posts";
+        }
     }
     // We can access the values submitted from the form using our @RequestParam annotation
     @PostMapping("/posts/{id}/edit")
     public String submitEdit(@ModelAttribute Post postToEdit, @PathVariable long id) {
-
-        // grab the post from our DAO
+        if (postsDao.getById(id).getUser().getId() == ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getId()) {
+            postToEdit.setUser((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+            // grab the post from our DAO
 //    Post postToEdit = postsDao.getById(id);
-        // use setters to set new values to the object
+            // use setters to set new values to the object
 //    postToEdit.setTitle(title);
 //    postToEdit.setBody(body);
-        // save the object with new values
-        postsDao.save(postToEdit);
+            // save the object with new values
+            postsDao.save(postToEdit);
+        }
+
         return "redirect:/posts";
+
     }
 
     // For now, we need to use a GetMapping, that way, when we visit the page,
